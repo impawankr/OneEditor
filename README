@@ -1,0 +1,93 @@
+Inetial design approach: 
+
++-----------------------+
+|      Main Loop        |  <-- main.cpp
++-----------------------+
+| - Initializes editor  |
+| - Handles input loop  |
+| - Calls render/input  |
++-----------------------+
+          |
+          v
++-----------------------+
+|   Terminal Controller |  <-- Terminal.cpp/.h
++-----------------------+
+| - Sets raw mode       |
+| - Restores terminal   |
+| - Reads keypresses    |
+| - Handles ESC codes   |
++-----------------------+
+          |
+          v
++-----------------------+
+|    Input Handler      |  <-- Input.cpp/.h
++-----------------------+
+| - Maps keys to actions|
+| - Cursor movement     |
+| - Insert/Delete chars |
++-----------------------+
+          |
+          v
++-----------------------+
+|     Editor Buffer     |  <-- Buffer.cpp/.h
++-----------------------+
+| - Stores lines (text) |
+| - Manages cursor pos  |
+| - Insert/Delete ops   |
+| - Scroll offset       |
++-----------------------+
+          |
+          v
++-----------------------+
+|   Screen Renderer     |  <-- Renderer.cpp/.h
++-----------------------+
+| - Builds output       |
+| - Draws lines         |
+| - Status bar, cursor  |
+| - Uses ANSI escape    |
++-----------------------+
+          |
+          v
++-----------------------+
+|      File Manager     |  <-- FileIO.cpp/.h
++-----------------------+
+| - Load from file      |
+| - Save to file        |
+| - Track filename      |
++-----------------------+
+
+
+files:
+
+text-editor/
+├── src/
+│   ├── main.cpp                // Entry point
+│
+│   ├── editor/                 // Core logic
+│   │   ├── Editor.h
+│   │   ├── Editor.cpp
+│   │   ├── InputHandler.h
+│   │   ├── InputHandler.cpp
+│   │   ├── EditorBuffer.h
+│   │   ├── EditorBuffer.cpp
+│
+│   ├── terminal/               // Terminal I/O
+│   │   ├── Terminal.h
+│   │   ├── Terminal.cpp
+│   │   ├── KeyCodes.h          // Enum for key constants
+│
+│   ├── render/                 // Drawing to screen
+│   │   ├── Renderer.h
+│   │   ├── Renderer.cpp
+│
+│   ├── file/                   // File load/save
+│   │   ├── FileManager.h
+│   │   ├── FileManager.cpp
+│
+├── include/                    // Public headers (optional)
+│
+├── build/                      // Output directory
+│
+├── CMakeLists.txt              // CMake build config (or use Makefile)
+└── README.md
+
