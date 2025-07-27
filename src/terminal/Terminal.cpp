@@ -1,10 +1,13 @@
 #include "Terminal.h"
 #include <termios.h>
 #include <unistd.h>
-#include <iostream>
 #include <cstdlib>
 #include <cstdio>
-
+#include "../input/KeyCodes.h"
+#include <fcntl.h> // fcntl is library for file control operations
+#include <sys/ioctl.h> // ioctl is library for terminal I/O control
+#include <errno.h> // errno is used for error handling 
+                   
 static struct termios orig_termios;  // Stores original terminal settings
 
 // Helper to exit with an error
@@ -47,6 +50,17 @@ void Terminal::enableRawMode() {
         die("tcsetattr");
 }
 
+void Terminal::getWindowSize(int& rows, int& cols) {
+    struct winsize ws;
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == -1) {
+        rows = 0;
+        cols = 0;
+    } else {
+        rows = ws.ws_row;
+        cols = ws.ws_col;
+    }
+}
+
 // Constructor
 Terminal::Terminal() {
     enableRawMode();
@@ -56,7 +70,7 @@ Terminal::Terminal() {
 Terminal::~Terminal() {}
 
 // Read a single key (non-blocking, short timeout)
-char Terminal::readKey() {
+int Terminal::readKey() {
     char c;
     ssize_t n;
 
@@ -65,6 +79,24 @@ char Terminal::readKey() {
             die("read");
     }
 
-    return c;
-}
+    if (c == '\x1b') {
+        char seq[3];
 
+        // Try to read the next 2 bytes of the escape sequence
+        if (read(STDIN_FILENO, &seq[0], 1) != 1) return '\x1b';
+        if (read(STDIN_FILENO, &seq[1], 1) != 1) return '\x1b';
+
+        if (seq[0] == '[') {
+            switch (seq[1]) {
+                case 'A': return ARROW_UP;
+                case 'B': return ARROW_DOWN;
+                case 'C': return ARROW_RIGHT;
+                case 'D': return ARROW_LEFT;
+            }
+        }
+
+        return '\x1b';  // Unknown sequence
+    }
+
+    return c;  // Normal key
+}
