@@ -1,8 +1,11 @@
 #include "editor/Editor.h"
 
-int main() {
-    Editor editor;
-    editor.run();  // main loop
+int main(int argc, char* argv[]) {
+    if (argc >= 2) {
+        editor.openFile(argv[1]);
+    }
+
+    editor.run();  // start the editor
     return 0;
 }
 

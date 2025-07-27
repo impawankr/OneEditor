@@ -16,15 +16,46 @@ Editor::Editor() {
     };
 }
 
+// Scroll function
+void Editor::scroll() {
+    // Adjust rowOffset based on cursor position
+    if (cursorY < rowOffset) {
+        rowOffset = cursorY;
+    } else if (cursorY >= rowOffset + screenRows - 1) {
+        rowOffset = cursorY - (screenRows - 2);
+    }
+
+    // Adjust colOffset based on cursor position
+    if (cursorX < colOffset) {
+        colOffset = cursorX;
+    } else if (cursorX >= colOffset + screenCols) {
+        colOffset = cursorX - screenCols + 1;
+    }
+}
+
 void Editor::refreshScreen() {
+    scroll();  // Adjust scrolling based on cursor position
     write(STDOUT_FILENO, "\x1b[2J", 4);      // Clear screen
     write(STDOUT_FILENO, "\x1b[H", 3);       // Move to top-left
+
+    for (int i = 0; i < screenRows; ++i) {
+        int fileRow = rowOffset + i;
+        if (fileRow < static_cast<int>(buffer.size())) {
+            std::string line = buffer[fileRow];
+            if ((int)line.length() > colOffset)
+                line = line.substr(colOffset, screenCols);
+            else
+                line = "";
+            write(STDOUT_FILENO, line.c_str(), line.length());
+        }
+        write(STDOUT_FILENO, "\r\n", 2);
+    }
 
     terminal.getWindowSize(screenRows, screenCols);  // Get terminal size
 
     // Draw text buffer
     for (int i = 0; i < screenRows - 1; ++i) {  // Leave last row for status
-        if (i < buffer.size()) {
+        if (i < static_cast<int>(buffer.size())) {
             write(STDOUT_FILENO, buffer[i].c_str(), buffer[i].size());
         }
         write(STDOUT_FILENO, "\r\n", 2);
@@ -38,7 +69,7 @@ void Editor::refreshScreen() {
     statusBar += status;
 
     // Pad with spaces to reach screen width
-    while (statusBar.size() < screenCols) {
+    while (statusBar.size() < static_cast<size_t>(screenCols)) {
     statusBar += ' ';
     }
     statusBar += "\x1b[m";  // Reset formatting
@@ -64,7 +95,7 @@ void Editor::processKey(int key) {
             if (cursorY > 0) cursorY--;
             break;
         case ARROW_DOWN:
-            if (cursorY < (int)buffer.size() - 1) cursorY++;
+            if (cursorY < static_cast<int>(buffer.size()) - 1) cursorY++;
             break;
         case ARROW_LEFT:
             if (cursorX > 0) cursorX--;
@@ -72,6 +103,22 @@ void Editor::processKey(int key) {
         case ARROW_RIGHT:
             if (cursorY < (int)buffer.size()) {
                 if (cursorX < (int)buffer[cursorY].size()) cursorX++;
+            }
+            break;
+        case PAGE_UP:
+            cursorY -= screenRows - 1;
+            if (cursorY < 0) cursorY = 0;
+            break;
+        case PAGE_DOWN:
+            cursorY += screenRows - 1;
+            if (cursorY >= static_cast<int>(buffer.size())) cursorY = buffer.size() - 1;
+            break;
+        case HOME:
+            cursorX = 0;
+            break;
+        case END:
+            if (cursorY < static_cast<int>(buffer.size())) {
+                cursorX = buffer[cursorY].length();
             }
             break;
         case BACKSPACE:
@@ -89,7 +136,7 @@ void Editor::processKey(int key) {
             break;
         case '\r':
             // Handle Enter key
-            if (cursorY >= buffer.size()) {
+            if (cursorY >= static_cast<int>(buffer.size())) {
                 buffer.push_back("");
             }
             buffer.insert(buffer.begin() + cursorY + 1, buffer[cursorY].substr(cursorX));
@@ -98,20 +145,13 @@ void Editor::processKey(int key) {
             cursorX = 0;
             break;
         case SAVEFILE:
-            // Handle custom save key (Ctrl+S)
-            {
-                std::ofstream outFile("output.txt");
-                for (const auto& line : buffer) {
-                    outFile << line << "\n";
-                }
-                outFile.close();
-            }
+            saveFile(currentFilename);
             break;
     }
 
     // 🆕 Insert printable characters
     if (key >= 32 && key <= 126) {
-        if (cursorY >= buffer.size()) {
+        if (cursorY >= static_cast<int>(buffer.size())) {
             buffer.push_back("");
         }
 
@@ -120,7 +160,7 @@ void Editor::processKey(int key) {
     }
 
     // Clamp cursorX if it's beyond current line length
-    if (cursorY < buffer.size()) {
+    if (cursorY < static_cast<int>(buffer.size())) {
         if (cursorX > (int)buffer[cursorY].length()) {
             cursorX = buffer[cursorY].length();
         }
@@ -151,5 +191,16 @@ void Editor::openFile(const std::string& filename) {
     inFile.close();
     cursorX = 0;
     cursorY = 0;
+}
+
+void Editor::saveFile(const std::string& filename) {
+    std::ofstream outFile(filename);
+    if (!outFile.is_open()) return;
+
+    for (const auto& line : buffer) {
+        outFile << line << "\n";
+    }
+
+    outFile.close();
 }
 

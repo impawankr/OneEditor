@@ -92,6 +92,20 @@ int Terminal::readKey() {
                 case 'B': return ARROW_DOWN;
                 case 'C': return ARROW_RIGHT;
                 case 'D': return ARROW_LEFT;
+                case '5': {
+                    char tilde;
+                    if (read(STDIN_FILENO, &tilde, 1) == 1 && tilde == '~')
+                        return PAGE_UP;
+                    break;
+                }
+                case '6': {
+                    char tilde;
+                    if (read(STDIN_FILENO, &tilde, 1) == 1 && tilde == '~')
+                        return PAGE_DOWN;
+                    break;
+                }
+                case 'H': return HOME;
+                case 'F': return END;
             }
         }
 
