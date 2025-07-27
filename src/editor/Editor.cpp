@@ -5,6 +5,8 @@
 #include <cstring>
 #include <fstream>
 
+Editor editor;  // Global editor instance
+
 Editor::Editor() {
     buffer = {
         "Welcome to MyTextEdit!",
@@ -103,9 +105,6 @@ void Editor::processKey(int key) {
                     outFile << line << "\n";
                 }
                 outFile.close();
-                write(STDOUT_FILENO, "\x1b[2J", 4);
-                write(STDOUT_FILENO, "\x1b[H", 3);
-                write(STDOUT_FILENO, "File saved to output.txt\n", 26);
             }
             break;
     }
@@ -135,5 +134,22 @@ void Editor::run() {
         int key = terminal.readKey();
         processKey(key);
     }
+}
+
+void Editor::openFile(const std::string& filename) {
+    currentFilename = filename;
+    std::ifstream inFile(filename);
+    if (!inFile.is_open()) return;
+
+    std::string line;
+    buffer.clear();
+
+    while (std::getline(inFile, line)) {
+        buffer.push_back(line);
+    }
+
+    inFile.close();
+    cursorX = 0;
+    cursorY = 0;
 }
 

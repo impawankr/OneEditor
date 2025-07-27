@@ -9,6 +9,7 @@ class Editor {
 public:
     Editor();
     void run();
+    void openFile(const std::string& filename);
 
 private:
     Terminal terminal;
@@ -17,8 +18,9 @@ private:
     int screenRows = 0;
     int screenCols = 0;
     std::vector<std::string> buffer;
-
+    std::string currentFilename;
     void refreshScreen();
     void processKey(int key);
 };
 
+extern Editor editor;  // Global editor instance
