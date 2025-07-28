@@ -2,6 +2,7 @@
 
 // Any value > 255 avoids clashing with normal characters
 enum EditorKey {
+    LINENUMBER = 12,
     SAVEFILE = 19, // Custom key for saving file
     BACKSPACE = 127, // ASCII backspace
     ARROW_LEFT = 1000,

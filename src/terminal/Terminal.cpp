@@ -112,5 +112,10 @@ int Terminal::readKey() {
         return '\x1b';  // Unknown sequence
     }
 
+    // Handle Ctrl+L for line number toggle
+    if (c == 12) {  // Ctrl+L (form feed)
+        return LINENUMBER;
+    }
+
     return c;  // Normal key
 }

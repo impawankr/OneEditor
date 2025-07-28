@@ -28,6 +28,9 @@ private:
     // Scrolling perameters
     int rowOffset = 0;
     int colOffset = 0;
+
+    // line number
+    bool showLineNumbers = true;
 };
 
 extern Editor editor;  // Global editor instance

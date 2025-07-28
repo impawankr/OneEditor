@@ -14,16 +14,40 @@ Editor::Editor() {
         "This is editable dummy text.",
         "Press 'q' to quit."
     };
+    
+    // Initialize cursor and offset positions
+    cursorX = 0;
+    cursorY = 0;
+    rowOffset = 0;
+    colOffset = 0;
+    
+    // Get initial terminal size
+    terminal.getWindowSize(screenRows, screenCols);
+    if (screenRows <= 0) screenRows = 24;
+    if (screenCols <= 0) screenCols = 80;
 }
 
 // Scroll function
 void Editor::scroll() {
+    // Get actual terminal size
+    terminal.getWindowSize(screenRows, screenCols);
+    
+    // Ensure we have at least some screen space
+    if (screenRows <= 0) screenRows = 24;
+    if (screenCols <= 0) screenCols = 80;
+    
     // Adjust rowOffset based on cursor position
-    if (cursorY < rowOffset) {
+    if (cursorY == 0) {
+        // Special case: if cursor is at the very top, ensure first line is visible
+        rowOffset = 0;
+    } else if (cursorY < rowOffset) {
         rowOffset = cursorY;
-    } else if (cursorY >= rowOffset + screenRows - 1) {
-        rowOffset = cursorY - (screenRows - 2);
+    } else if (cursorY >= rowOffset + screenRows - 2) {  // Leave 1 row for status bar
+        rowOffset = cursorY - (screenRows - 3);  // Adjust for status bar
     }
+    
+    // Ensure rowOffset doesn't go negative
+    if (rowOffset < 0) rowOffset = 0;
 
     // Adjust colOffset based on cursor position
     if (cursorX < colOffset) {
@@ -31,55 +55,69 @@ void Editor::scroll() {
     } else if (cursorX >= colOffset + screenCols) {
         colOffset = cursorX - screenCols + 1;
     }
+    
+    // Ensure colOffset doesn't go negative
+    if (colOffset < 0) colOffset = 0;
 }
 
 void Editor::refreshScreen() {
-    scroll();  // Adjust scrolling based on cursor position
-    write(STDOUT_FILENO, "\x1b[2J", 4);      // Clear screen
-    write(STDOUT_FILENO, "\x1b[H", 3);       // Move to top-left
+    scroll();
+    write(STDOUT_FILENO, "\x1b[2J", 4); // Clear screen
+    write(STDOUT_FILENO, "\x1b[H", 3);  // Move cursor to top-left
 
-    for (int i = 0; i < screenRows; ++i) {
+    int lineNumberWidth = showLineNumbers ? 6 : 0;
+    int displayRows = screenRows - 1;  // Leave 1 row for status bar
+
+    for (int i = 0; i < displayRows; ++i) {
         int fileRow = rowOffset + i;
+        std::string displayLine;
+
         if (fileRow < static_cast<int>(buffer.size())) {
+            if (showLineNumbers) {
+                char lineNum[16];
+                snprintf(lineNum, sizeof(lineNum), "%4d | ", fileRow + 1);
+                displayLine += lineNum;
+            }
+
             std::string line = buffer[fileRow];
-            if ((int)line.length() > colOffset)
-                line = line.substr(colOffset, screenCols);
+            if (static_cast<int>(line.length()) > colOffset)
+                line = line.substr(colOffset, screenCols - lineNumberWidth);
             else
                 line = "";
-            write(STDOUT_FILENO, line.c_str(), line.length());
-        }
-        write(STDOUT_FILENO, "\r\n", 2);
-    }
 
-    terminal.getWindowSize(screenRows, screenCols);  // Get terminal size
-
-    // Draw text buffer
-    for (int i = 0; i < screenRows - 1; ++i) {  // Leave last row for status
-        if (i < static_cast<int>(buffer.size())) {
-            write(STDOUT_FILENO, buffer[i].c_str(), buffer[i].size());
+            displayLine += line;
         }
+
+        write(STDOUT_FILENO, displayLine.c_str(), displayLine.length());
         write(STDOUT_FILENO, "\r\n", 2);
     }
 
     // Draw status bar
     char status[80];
-    snprintf(status, sizeof(status), "EDITOR -- Pos: (%d, %d)", cursorY + 1, cursorX + 1);
+    snprintf(status, sizeof(status), "EDITOR -- Pos: (%d, %d) | RowOffset: %d", cursorY + 1, cursorX + 1, rowOffset);
 
     std::string statusBar = "\x1b[7m";  // Start inverted
     statusBar += status;
 
-    // Pad with spaces to reach screen width
     while (statusBar.size() < static_cast<size_t>(screenCols)) {
-    statusBar += ' ';
+        statusBar += ' ';
     }
-    statusBar += "\x1b[m";  // Reset formatting
+    statusBar += "\x1b[m";  // End inverted
+    write(STDOUT_FILENO, statusBar.c_str(), statusBar.length());
+    write(STDOUT_FILENO, "\r\n", 2);
 
-    write(STDOUT_FILENO, statusBar.c_str(), statusBar.size());
-
-
-    // Move cursor to actual position
+    // Position the cursor - ensure it's visible
+    int cursorRow = (cursorY - rowOffset) + 1;
+    int cursorCol = (cursorX - colOffset) + (showLineNumbers ? lineNumberWidth + 1 : 1);
+    
+    // Ensure cursor position is within visible area
+    if (cursorRow < 1) cursorRow = 1;
+    if (cursorRow > displayRows) cursorRow = displayRows;
+    if (cursorCol < 1) cursorCol = 1;
+    if (cursorCol > screenCols) cursorCol = screenCols;
+    
     char buf[32];
-    snprintf(buf, sizeof(buf), "\x1b[%d;%dH", cursorY + 1, cursorX + 1);
+    snprintf(buf, sizeof(buf), "\x1b[%d;%dH", cursorRow, cursorCol);
     write(STDOUT_FILENO, buf, strlen(buf));
 }
 
@@ -89,8 +127,11 @@ void Editor::processKey(int key) {
         case 'q':
             write(STDOUT_FILENO, "\x1b[2J", 4);
             write(STDOUT_FILENO, "\x1b[H", 3);
+            saveFile(currentFilename);
             exit(0);
-
+        case SAVEFILE:
+            saveFile(currentFilename);
+            break;
         case ARROW_UP:
             if (cursorY > 0) cursorY--;
             break;
@@ -134,6 +175,9 @@ void Editor::processKey(int key) {
                 cursorY--;
             }
             break;
+        case LINENUMBER:
+                showLineNumbers = !showLineNumbers;
+                break;
         case '\r':
             // Handle Enter key
             if (cursorY >= static_cast<int>(buffer.size())) {
@@ -143,9 +187,6 @@ void Editor::processKey(int key) {
             buffer[cursorY] = buffer[cursorY].substr(0, cursorX);
             cursorY++;
             cursorX = 0;
-            break;
-        case SAVEFILE:
-            saveFile(currentFilename);
             break;
     }
 
